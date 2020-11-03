@@ -1,0 +1,20 @@
+Package: polarization
+Title: Measurement Methods for Party Polarization
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Yunkyu",
+           family = "Sohn",
+           role = c("aut", "cre"),
+           email = "ysohn.r@gmail.com")
+Authors: Yunkyu Sohn <ysohn.r@gmail.com>
+Description: This package implements several well-known party polarization measures for revealed preference data sets with binary responses (e.g. vote matrices, networks).
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports: 
+    pscl,
+    Rvoteview,
+    wnominate
+URL: http://ysohn.com

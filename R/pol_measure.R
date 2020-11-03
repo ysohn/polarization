@@ -1,0 +1,145 @@
+#' Polarization measure
+#'
+#' Polarization measure calculation from an \eqn{N\times 1} vector of voter ideology
+#' and an \eqn{N\times 1} vector of voter party affiliation.
+#' @param ideology \eqn{N\times 1} vector of voter ideology.
+#' @param party \eqn{N\times 1} vector of voter party affiliation.
+#' @param method Polarization measure. \eqn{\mu_s} is the mean ideology of party \eqn{s}, \eqn{P} is the number of parties, \eqn{\rho_s} is the discrepancy between the maximum value and the minimum value of party \eqn{s} members' ideology, \eqn{\bar\mu} is the mean ideology of the entire set of individuals, and \eqn{N_s} is the number of members of party \eqn{s}.
+#' \itemize{
+#'   \item \code{dist} Distance measure (McCarty \emph{et al}., 2016)
+#'   \deqn{Distance = \frac{\sum_{s\neq p}\left|{\mu_s-\mu_p}\right|}{P(P-1)}}
+#'
+#'   \item \code{range} Range measure (Rehm and Reilly, 2010)
+#'     \deqn{Range = \frac{\sum_{s\neq p}\max\left(\left|\mu_s-\mu_p\right|-\frac{\rho_s+\rho_p}{4},0\right)}{P(P-1)}}
+#'
+#'   \item \code{deviation} Deviation measure (Rehm and Reilly, 2010)
+#'   \deqn{Deviation = \sqrt{\frac{\sum_s\left\{\max\left(\left|\mu_s-\bar\mu\right|-\frac{\rho_s}{4},0\right)\right\}^2}{P}}}
+#'
+#'   \item \code{ER} Esteban and Ray measure (Esteban and Ray, 1994; Rehm and Reilly, 2010)
+#'   \deqn{ER = \sum_{p=1}^{P}\sum_{s=1}^{P}N_s^2N_p\max\left(\left|\mu_s-\mu_p\right|-\frac{\rho_s+\rho_p}{4},0\right)}
+#' }
+#' @param exclude A vector of party labels to be excluded (\emph{e.g.} party label for an independent member).
+#' @return Polarization measure.
+#' @export pol_measure
+#' @examples
+#' ## Calculate the four versions of party polarization measures after generating
+#' ## a vote matrix with 1000 votes in a two party legislature consisting of 100 legislators.
+#' party <- rbind(matrix(1,50,1),matrix(2,50,1))
+#' vote_data <- pol_simul(party = party, M = 1000, partyMean = c(-1,1), partySD = c(.5,.5))
+#' V <- vote_data$votes
+#' rc <- pscl::rollcall(V)
+#' wn_result <- wnominate::wnominate(rc,polarity=c(1),dims=1)
+#' ideology <- wn_result$legislators$coord1D
+#' pol_value <- matrix(0,4,1)
+#' for (i in 1:4){
+#'   pol_value[i,1] <- pol_measure(ideology, party, i)
+#' }
+#'
+#'
+#' ## Measure the party polarization level of the 110th U.S. Senate
+#' ## using the range measure after excluding independent members with party label 328.
+#' res <- Rvoteview::voteview_search(chamber = "Senate", congress = c(110))
+#' rc <- Rvoteview::voteview_download(res$id)
+#' pol_value <- pol_measure(as.numeric(rc$legis.data$dim1), rc$legis.data$party_code, 'range', 328)
+#'
+#' @references Esteban, Joan-Maria, and Debraj Ray. "On the measurement of polarization." \emph{Econometrica: Journal of the Econometric Society} (1994): 819-851.
+#'
+#' Rehm, Philipp, and Timothy Reilly. "United we stand: Constituency homogeneity and comparative party polarization." \emph{Electoral Studies} 29.1 (2010): 40-53.
+#'
+#' McCarty, Nolan, Keith T. Poole, and Howard Rosenthal. \emph{Polarized America: The dance of ideology and unequal riches}. MIT Press, 2016.
+#'
+#' Poole, Keith T., et al. "Scaling roll call votes with wnominate in R." \emph{Journal of Statistical Software} 42.14 (2011): 1-21.
+#'
+#' Zeileis, Achim, Christian Kleiber, and Simon Jackman. "Regression models for count data in R." \emph{Journal of statistical software} 27.8 (2008): 1-25.
+
+pol_measure <- function(ideology,
+                        party,
+                        method,
+                        exclude=NULL) {
+  if (!is.numeric(ideology)) {
+    stop("ideology must be numeric. Check with class(ideology). Convert your object using as.numeric() if necessary.\n")
+    }
+
+  if(!is.null(exclude)) {
+    ind <- matrix(1,length(party))
+    for (i in 1:length(exclude)) {
+      ind <- (party!=exclude[i]) & ind
+    }
+    ideology <- ideology[ind]
+    party <- party[ind]
+  }
+
+  switch(method,
+
+         dist={
+           print('dist')
+           plist <- as.matrix(as.numeric(names(table(party))))
+           P <- max(dim(plist)[1],dim(plist)[2])
+           D <- matrix(0,P,P)
+           for (i in 1:P){
+             a=ideology[party==plist[i]]
+             for (j in 1:P){
+               b=ideology[party==plist[j]]
+               if (i>j){
+                 D[i,j] <- abs(mean(a)-mean(b))
+               }
+             }
+           }
+
+           result <- sum(D)/(P*(P-1)/2)
+           return(result)
+         },
+
+         range={
+           print('range')
+           plist <- as.matrix(as.numeric(names(table(party))))
+           P <- max(dim(plist)[1],dim(plist)[2])
+           D <- matrix(0,P,P)
+           for (i in 1:P){
+             a=ideology[party==plist[i]]
+             for (j in 1:P){
+               b=ideology[party==plist[j]]
+               if (i>j){
+                 D[i,j] <- max(abs(mean(a)-mean(b))-(max(a)+max(b)-min(a)-min(b))/4,0)
+               }
+             }
+           }
+           result <- sum(D)/(P*(P-1)/2)
+           return(result)
+         },
+
+         deviation={
+           print('deviation')
+           plist <- as.matrix(as.numeric(names(table(party))))
+           P <- max(dim(plist)[1],dim(plist)[2])
+           D <- matrix(0,P,1)
+           for (i in 1:P){
+             a=ideology[party==plist[i]]
+             D[i,1] <- max(abs(mean(a)-mean(ideology))-(max(a)-min(a))/4,0)
+           }
+           result <-  (sum(D^2)/length(plist))^.5
+           return(result)
+         },
+
+         ER={
+           print('ER')
+           plist <- as.matrix(as.numeric(names(table(party))))
+           c <- as.numeric(table(party))
+           P <- max(dim(plist)[1],dim(plist)[2])
+           D <- matrix(0,P,P)
+           for (i in 1:P){
+             a=ideology[party==plist[i]]
+             for (j in 1:P){
+               b=ideology[party==plist[j]]
+               if (i!=j){
+                 D[i,j] <- (c(plist[i])^2)*c(plist[j])*max(abs(mean(a)-mean(b))-(max(a)+max(b)-min(a)-min(b))/4,0)
+               }
+             }
+           }
+           result <- sum(D)/(P*(P-1))
+           return(result)
+         },
+
+         warning("no match\n")
+  )
+}
